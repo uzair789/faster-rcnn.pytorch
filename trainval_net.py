@@ -58,7 +58,10 @@ def parse_args():
                       default=10000, type=int)
 
   parser.add_argument('--save_dir', dest='save_dir',
-                      help='directory to save models', default="models",
+                      help='directory to save models', default="results",
+                      type=str)
+  parser.add_argument('--exp_name', dest='exp_name',
+                      help='experiment folder',
                       type=str)
   parser.add_argument('--nw', dest='num_workers',
                       help='number of worker to load data',
@@ -161,8 +164,10 @@ if __name__ == '__main__':
       args.imdbval_name = "voc_2007_test"
       args.set_cfgs = ['ANCHOR_SCALES', '[8, 16, 32]', 'ANCHOR_RATIOS', '[0.5,1,2]', 'MAX_NUM_GT_BOXES', '20']
   elif args.dataset == "coco":
-      args.imdb_name = "coco_2014_train+coco_2014_valminusminival"
-      args.imdbval_name = "coco_2014_minival"
+      #args.imdb_name = "coco_2014_train+coco_2014_valminusminival"
+      #args.imdbval_name = "coco_2014_minival"
+      args.imdb_name = "coco_2017_train"
+      args.imdbval_name = "coco_2017_val"
       args.set_cfgs = ['ANCHOR_SCALES', '[4, 8, 16, 32]', 'ANCHOR_RATIOS', '[0.5,1,2]', 'MAX_NUM_GT_BOXES', '50']
   elif args.dataset == "imagenet":
       args.imdb_name = "imagenet_train"
@@ -199,7 +204,7 @@ if __name__ == '__main__':
 
   print('{:d} roidb entries'.format(len(roidb)))
 
-  output_dir = args.save_dir + "/" + args.net + "/" + args.dataset
+  output_dir = args.save_dir + "/" + args.net + "/" + args.dataset + "/" + args.exp_name
   if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -237,11 +242,15 @@ if __name__ == '__main__':
   if args.net == 'vgg16':
     fasterRCNN = vgg16(imdb.classes, pretrained=True, class_agnostic=args.class_agnostic)
   elif args.net == 'res101':
-    fasterRCNN = resnet(imdb.classes, 101, pretrained=True, class_agnostic=args.class_agnostic)
+    fasterRCNN = resnet(imdb.classes, 101, pretrained=False, class_agnostic=args.class_agnostic)
   elif args.net == 'res50':
     fasterRCNN = resnet(imdb.classes, 50, pretrained=True, class_agnostic=args.class_agnostic)
   elif args.net == 'res152':
     fasterRCNN = resnet(imdb.classes, 152, pretrained=True, class_agnostic=args.class_agnostic)
+  elif args.net == 'res18':
+    print("loading resnet18")
+    fasterRCNN = resnet(imdb.classes, 18, pretrained=False, class_agnostic=args.class_agnostic)
+
   else:
     print("network is not defined")
     pdb.set_trace()
@@ -307,6 +316,7 @@ if __name__ == '__main__':
 
     data_iter = iter(dataloader)
     for step in range(iters_per_epoch):
+      continue
       data = next(data_iter)
       with torch.no_grad():
               im_data.resize_(data[0].size()).copy_(data[0])

@@ -220,14 +220,19 @@ def resnet152(pretrained=False):
 class resnet(_fasterRCNN):
   def __init__(self, classes, num_layers=101, pretrained=False, class_agnostic=False):
     self.model_path = 'data/pretrained_model/resnet101_caffe.pth'
-    self.dout_base_model = 1024
+    self.dout_base_model = 256 #1024
+    self.pooled_feat_size = 512 # 2048
     self.pretrained = pretrained
     self.class_agnostic = class_agnostic
+    self.num_layers = num_layers
 
     _fasterRCNN.__init__(self, classes, class_agnostic)
 
   def _init_modules(self):
-    resnet = resnet101()
+    if self.num_layers == 101:
+        resnet = resnet101()
+    elif self.num_layers == 18:
+        resnet = resnet18()
 
     if self.pretrained == True:
       print("Loading pretrained weights from %s" %(self.model_path))
@@ -240,11 +245,11 @@ class resnet(_fasterRCNN):
 
     self.RCNN_top = nn.Sequential(resnet.layer4)
 
-    self.RCNN_cls_score = nn.Linear(2048, self.n_classes)
+    self.RCNN_cls_score = nn.Linear(self.pooled_feat_size, self.n_classes)
     if self.class_agnostic:
-      self.RCNN_bbox_pred = nn.Linear(2048, 4)
+      self.RCNN_bbox_pred = nn.Linear(self.pooled_feat_size, 4)
     else:
-      self.RCNN_bbox_pred = nn.Linear(2048, 4 * self.n_classes)
+      self.RCNN_bbox_pred = nn.Linear(self.pooled_feat_size, 4 * self.n_classes)
 
     # Fix blocks
     for p in self.RCNN_base[0].parameters(): p.requires_grad=False

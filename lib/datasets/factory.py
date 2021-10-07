@@ -22,8 +22,10 @@ import numpy as np
 for year in ['2007', '2012']:
   for split in ['train', 'val', 'trainval', 'test']:
     name = 'voc_{}_{}'.format(year, split)
-    __sets[name] = (lambda split=split, year=year: pascal_voc(split, year))
+    __sets[name] = (lambda split=split, year=year: pascal_voc(split, year,
+                                                              devkit_path='path_to_voc'))
 
+'''
 # Set up coco_2014_<split>
 for year in ['2014']:
   for split in ['train', 'val', 'minival', 'valminusminival', 'trainval']:
@@ -58,6 +60,15 @@ for split in ['train', 'val', 'val1', 'val2', 'test']:
     devkit_path = 'data/imagenet/ILSVRC/devkit'
     data_path = 'data/imagenet/ILSVRC'
     __sets[name] = (lambda split=split, devkit_path=devkit_path, data_path=data_path: imagenet(split,devkit_path,data_path))
+'''
+
+
+# Set up coco_2015_<split>
+for year in ['2017']:
+  for split in ['train', 'val']:
+    name = 'coco_{}_{}'.format(year, split)
+    __sets[name] = (lambda split=split, year=year: coco(split, year))
+
 
 def get_imdb(name):
   """Get an imdb (image database) by name."""
