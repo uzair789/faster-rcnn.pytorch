@@ -219,7 +219,7 @@ def resnet152(pretrained=False):
 
 class resnet(_fasterRCNN):
   def __init__(self, classes, num_layers=101, pretrained=False, class_agnostic=False):
-    self.model_path = 'data/pretrained_model/resnet101_caffe.pth'
+    self.model_path = '/media/apple/faster-rcnn.pytorch/resnet18-5c106cde.pth'
     self.dout_base_model = 256 #1024
     self.pooled_feat_size = 512 # 2048
     self.pretrained = pretrained

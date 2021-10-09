@@ -265,6 +265,7 @@ class coco(imdb):
     with open(eval_file, 'wb') as fid:
       pickle.dump(coco_eval, fid, pickle.HIGHEST_PROTOCOL)
     print('Wrote COCO eval results to: {}'.format(eval_file))
+    return coco_eval.stats
 
   def _coco_results_one_category(self, boxes, cat_id):
     results = []
@@ -302,7 +303,7 @@ class coco(imdb):
     with open(res_file, 'w') as fid:
       json.dump(results, fid)
 
-  def evaluate_detections(self, all_boxes, output_dir):
+  def evaluate_detections(self, all_boxes, output_dir, exp):
     res_file = osp.join(output_dir, ('detections_' +
                                      self._image_set +
                                      self._year +
@@ -313,7 +314,10 @@ class coco(imdb):
     self._write_coco_results_file(all_boxes, res_file)
     # Only do evaluation on non-test sets
     if self._image_set.find('test') == -1:
-      self._do_detection_eval(res_file, output_dir)
+      summary = self._do_detection_eval(res_file, output_dir)
+      exp.log_metric('Validation: ap1', float(summary[0]))
+      exp.log_metric('Validation: IOU_0.5', float(summary[1]))
+      exp.log_metric('Validation: IOU_0.75', float(summary[2]))  
     # Optionally cleanup results json file
     if self.config['cleanup']:
       os.remove(res_file)
