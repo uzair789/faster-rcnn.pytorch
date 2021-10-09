@@ -344,7 +344,7 @@ def parse_args():
 # config optimization
   parser.add_argument('--o', dest='optimizer',
                       help='training optimizer',
-                      default="sgd", type=str)
+                      default="adam", type=str)
   parser.add_argument('--lr', dest='lr',
                       help='starting learning rate',
                       default=0.001, type=float)
@@ -520,6 +520,8 @@ if __name__ == '__main__':
 
   lr = cfg.TRAIN.LEARNING_RATE
   lr = args.lr
+  if args.optimizer == "adam":
+    lr = 0.1 * lr
   #tr_momentum = cfg.TRAIN.MOMENTUM
   #tr_momentum = args.momentum
 
@@ -536,7 +538,7 @@ if __name__ == '__main__':
     fasterRCNN.cuda()
       
   if args.optimizer == "adam":
-    lr = lr * 0.1
+    #lr = lr * 0.1
     optimizer = torch.optim.Adam(params)
 
   elif args.optimizer == "sgd":
