@@ -7,7 +7,7 @@ import torchvision.models as models
 from torch.autograd import Variable
 import numpy as np
 from model.utils.config import cfg
-from model.rpn.rpn import _RPN
+from model.rpn.rpn import _RPN, _RPN_binary
 
 from model.roi_layers import ROIAlign, ROIPool
 
@@ -23,7 +23,7 @@ from icecream import ic
 
 class _fasterRCNN(nn.Module):
     """ faster RCNN """
-    def __init__(self, classes, class_agnostic):
+    def __init__(self, classes, class_agnostic, is_bin=False):
         super(_fasterRCNN, self).__init__()
         self.classes = classes
         self.n_classes = len(classes)
@@ -33,7 +33,11 @@ class _fasterRCNN(nn.Module):
         self.RCNN_loss_bbox = 0
 
         # define rpn
-        self.RCNN_rpn = _RPN(self.dout_base_model)
+        if is_bin:
+            self.RCNN_rpn = _RPN_binary(self.dout_base_model)
+        else:
+            self.RCNN_rpn = _RPN(self.dout_base_model)
+
         self.RCNN_proposal_target = _ProposalTargetLayer(self.n_classes)
 
         # self.RCNN_roi_pool = _RoIPooling(cfg.POOLING_SIZE, cfg.POOLING_SIZE, 1.0/16.0)

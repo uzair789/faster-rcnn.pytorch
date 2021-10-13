@@ -32,6 +32,7 @@ from model.utils.net_utils import weights_normal_init, save_net, load_net, \
 
 from model.faster_rcnn.vgg16 import vgg16
 from model.faster_rcnn.resnet import resnet
+from model.faster_rcnn.birealnet import birealnet
 
 from icecream import ic
 import neptune
@@ -305,7 +306,7 @@ def parse_args():
                       default=20, type=int)
   parser.add_argument('--disp_interval', dest='disp_interval',
                       help='number of iterations to display',
-                      default=100, type=int)
+                      default=1, type=int)
   parser.add_argument('--checkpoint_interval', dest='checkpoint_interval',
                       help='number of iterations to display',
                       default=10000, type=int)
@@ -511,6 +512,8 @@ if __name__ == '__main__':
   elif args.net == 'res18':
     print("loading resnet18")
     fasterRCNN = resnet(imdb.classes, 18, pretrained=True, class_agnostic=args.class_agnostic)
+  elif args.net == 'birealnet18':
+    fasterRCNN = birealnet(imdb.classes, 18, pretrained=False, class_agnostic=args.class_agnostic)
 
   else:
     print("network is not defined")
