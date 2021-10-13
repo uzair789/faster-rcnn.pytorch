@@ -10,6 +10,9 @@ data/*
 
 ## PyTorch
 
+*.pth
+results/
+
 .mypy_cache
 *.pyc
 */*.pyc
