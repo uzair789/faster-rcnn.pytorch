@@ -300,7 +300,7 @@ def parse_args():
                     default='vgg16', type=str)
   parser.add_argument('--start_epoch', dest='start_epoch',
                       help='starting epoch',
-                      default=1, type=int)
+                      default=0, type=int)
   parser.add_argument('--epochs', dest='max_epochs',
                       help='number of epochs to train',
                       default=20, type=int)
@@ -319,6 +319,9 @@ def parse_args():
                       type=str)
   parser.add_argument('--caption', dest='caption',
                       help='experiment caption',
+                      type=str)
+  parser.add_argument('--scheduler', dest='scheduler',
+                      help='lr scheduler',
                       type=str)
   parser.add_argument('--server', dest='server',
                       help='experiment server',
@@ -394,7 +397,8 @@ if __name__ == '__main__':
               'batch_size': args.batch_size,    
               'lr': args.lr,    
               'caption': args.caption,    
-              'server': args.server    
+              'server': args.server,
+              'scheduler': args.scheduler    
   }    
     
   exp = neptune.create_experiment(name=args.exp_name, params=PARAMS, tags=[args.net,    
@@ -547,6 +551,11 @@ if __name__ == '__main__':
   elif args.optimizer == "sgd":
     optimizer = torch.optim.SGD(params, momentum=cfg.TRAIN.MOMENTUM)
 
+  if args.scheduler=='LambdaLR':
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda step : (1.0-step/args.max_epochs), last_epoch=-1)
+
+
+
   if args.resume:
     load_name = os.path.join(output_dir,
       'faster_rcnn_{}_{}_{}.pth'.format(args.checksession, args.checkepoch, args.checkpoint))
@@ -571,7 +580,8 @@ if __name__ == '__main__':
     from tensorboardX import SummaryWriter
     logger = SummaryWriter("logs")
 
-  for epoch in range(args.start_epoch, args.max_epochs + 1):
+  #for epoch in range(args.start_epoch, args.max_epochs + 1):
+  for epoch in range(args.start_epoch, args.max_epochs):
     exp.log_metric('Current epoch', epoch)
     exp.log_metric('Current lr', float(optimizer.param_groups[0]['lr']))
     # setting to train mode
@@ -579,9 +589,13 @@ if __name__ == '__main__':
     loss_temp = 0
     start = time.time()
 
-    if epoch % (args.lr_decay_step + 1) == 0:
-        adjust_learning_rate(optimizer, args.lr_decay_gamma)
-        lr *= args.lr_decay_gamma
+
+    '''
+    if args.scheduler == 'OldScheduler':
+	    if epoch % (args.lr_decay_step + 1) == 0:
+		adjust_learning_rate(optimizer, args.lr_decay_gamma)
+		lr *= args.lr_decay_gamma
+    '''
 
     data_iter = iter(dataloader)
     for step in range(iters_per_epoch):
@@ -654,6 +668,10 @@ if __name__ == '__main__':
 
         loss_temp = 0
         start = time.time()
+
+    if args.scheduler == 'LambdaLR':
+        scheduler.step()
+
 
     exp.log_metric('epoch_loss_total', loss.mean().item())
     exp.log_metric('epoch_loss_rpn_cls', rpn_loss_cls.mean().item())
