@@ -1,9 +1,9 @@
-export CUDA_VISIBLE_DEVICES='2,3'
+export CUDA_VISIBLE_DEVICES='0'
 
 PRETRAIN_MODEL='/media/apple/faster-rcnn.pytorch/resnet18-5c106cde.pth'
 #DATASET_PATH='/home/biometrics/data/coco'
 DATASET_PATH='/media/apple/Datasets/coco'
-EXP_NAME='adam_Lr0.0001_fasterRCNN_resnet18_baseline_binarynet'
+EXP_NAME='adam_Lr0.0001_fasterRCNN_resnet18_baseline_binarynet_RPN_not_binary'
 #DATASET_PATH='/home/biometrics/data/VOCdevkit'
 LR=0.001
 CAPTION='FasterRCNN_binary'

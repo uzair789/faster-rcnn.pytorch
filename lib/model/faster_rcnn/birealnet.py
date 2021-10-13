@@ -170,7 +170,7 @@ class birealnet(_fasterRCNN):
     self.class_agnostic = class_agnostic
     self.num_layers = num_layers
 
-    _fasterRCNN.__init__(self, classes, class_agnostic, is_bin=True)
+    _fasterRCNN.__init__(self, classes, class_agnostic, is_bin=False)
 
   def _init_modules(self):
     if self.num_layers == 101:
