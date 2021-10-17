@@ -76,23 +76,23 @@ class _RPN_binary(nn.Module):
      
 
         # define the convrelu layers processing input feature map
-        #self.RPN_Conv = nn.Conv2d(self.din, 512, 3, 1, 1, bias=True)
+        self.RPN_Conv = nn.Conv2d(self.din, 512, 3, 1, 1, bias=True)
 
 
 
-        self.binary_activation = BinaryActivation()
+        ##self.binary_activation = BinaryActivation()
         #self.RPN_Conv = HardBinaryConv(self.din, 512, stride=1)
-        self.RPN_Conv = HardBinaryConv(self.din, self.din, stride=1)
+        ##self.RPN_Conv = HardBinaryConv(self.din, self.din, stride=1)
 
         # define bg/fg classifcation score layer
         self.nc_score_out = len(self.anchor_scales) * len(self.anchor_ratios) * 2 # 2(bg/fg) * 9 (anchors)
-        #self.RPN_cls_score = nn.Conv2d(512, self.nc_score_out, 1, 1, 0)
-        self.RPN_cls_score = nn.Conv2d(self.din, self.nc_score_out, 1, 1, 0)
+        self.RPN_cls_score = nn.Conv2d(512, self.nc_score_out, 1, 1, 0)
+        ##self.RPN_cls_score = nn.Conv2d(self.din, self.nc_score_out, 1, 1, 0)
 
         # define anchor box offset prediction layer
         self.nc_bbox_out = len(self.anchor_scales) * len(self.anchor_ratios) * 4 # 4(coords) * 9 (anchors)
-        #self.RPN_bbox_pred = nn.Conv2d(512, self.nc_bbox_out, 1, 1, 0)
-        self.RPN_bbox_pred = nn.Conv2d(self.din, self.nc_bbox_out, 1, 1, 0)
+        self.RPN_bbox_pred = nn.Conv2d(512, self.nc_bbox_out, 1, 1, 0)
+        ##self.RPN_bbox_pred = nn.Conv2d(self.din, self.nc_bbox_out, 1, 1, 0)
 
         # define proposal layer
         self.RPN_proposal = _ProposalLayer(self.feat_stride, self.anchor_scales, self.anchor_ratios)
@@ -119,10 +119,10 @@ class _RPN_binary(nn.Module):
         batch_size = base_feat.size(0)
 
         # return feature map after convrelu layer
-        x = self.binary_activation(base_feat)
-        rpn_conv1 = self.RPN_Conv(x) + base_feat
+        ##x = self.binary_activation(base_feat)
+        ##rpn_conv1 = self.RPN_Conv(x) + base_feat
 
-        #rpn_conv1 = F.relu(self.RPN_Conv(base_feat), inplace=True)
+        rpn_conv1 = F.relu(self.RPN_Conv(base_feat), inplace=True)
         # get rpn classification score
         rpn_cls_score = self.RPN_cls_score(rpn_conv1)
 
