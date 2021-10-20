@@ -5,6 +5,6 @@
 
 
 export CUDA_VISIBLE_DEVICES='0'
-EXP_ID='DIS-513'
+EXP_ID='DIS-516'
 NET='birealnet18'
 python test_net.py --cuda --dataset 'coco' --net ${NET} --exp_id ${EXP_ID}
