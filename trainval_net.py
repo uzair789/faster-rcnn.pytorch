@@ -36,7 +36,7 @@ from model.faster_rcnn.birealnet import birealnet
 
 from icecream import ic
 import neptune
-
+from torch.nn import functional as F
 
 ##
 
@@ -99,6 +99,45 @@ class sampler(Sampler):
 
   def __len__(self):
     return self.num_data
+
+
+def KL_loss(teacher_output, student_output, id_=1):    
+    """Process the KL divergence between the teacher and the student outputs after    
+    the sigmoid operation. The logit maps have been normalized for unit norm.    
+    
+    Arguments:    
+        teacher_output (torch.Tensor) - Nx(h*w*num_anchors)x80 for class    
+                                      - Nx(h*w*num_anchrs)x4 for reg    
+                                      teacher not softmaxed    
+        student_output (torch.Tensor) - same as teacher but not softmaxed    
+    Returns:    
+        KL divergence loss over the batch    
+    """    
+    assert(teacher_output.shape == student_output.shape)    
+    #batch_sum = 0    
+    
+    student_output_s = F.log_softmax(student_output, dim=2)    
+    teacher_output_s = F.softmax(teacher_output, dim=2)    
+    
+    #for i in range(teacher_output.shape[0]):    
+    #    # looping over samples in a batch    
+    #    teacher = teacher_output[i, :, :]    
+    #    student = student_output[i, :, :]    
+    
+    ic(teacher_output_s.shape)    
+    ic(student_output_s.permute(0,2,1).shape)    
+    assert(teacher_output_s.shape == student_output_s.shape)    
+    cross_entropy_loss = -torch.bmm(teacher_output_s, student_output_s.permute(0,2,1))    
+    cross_entropy_loss = cross_entropy_loss.mean()    
+    return cross_entropy_loss 
+
+
+
+
+
+
+
+
 
 
 def parse_args():
@@ -519,21 +558,21 @@ if __name__ == '__main__':
 
 
 
-      c_loss_distill = 0    
+      #c_loss_distill = 0    
       reg_loss_distill = 0    
       for i in range(args.batch_size):    
-         class_teacher = cls_score_teacher[i]/ torch.norm(cls_score_teacher[i])    
+         #class_teacher = cls_score_teacher[i]/ torch.norm(cls_score_teacher[i])    
          reg_teacher = bbox_pred_teacher[i] / torch.norm(bbox_pred_teacher[i])    
-         class_student = cls_score[i] / torch.norm(cls_score[i])    
+         #class_student = cls_score[i] / torch.norm(cls_score[i])    
          reg_student = bbox_pred[i] / torch.norm(bbox_pred[i])    
 
-         c_loss = torch.norm(class_teacher - class_student)    
+         #c_loss = torch.norm(class_teacher - class_student)    
          r_loss = torch.norm(reg_teacher - reg_student)    
 
-         c_loss_distill += c_loss    
+         #c_loss_distill += c_loss    
          reg_loss_distill += r_loss    
 
-      class_distill_loss = args.cdc * (c_loss_distill/args.batch_size)    
+      class_distill_loss = args.cdc * KL_loss(cls_score_teacher, cls_score) #(c_loss_distill/args.batch_size)    
       reg_distill_loss = args.rdc * (reg_loss_distill/args.batch_size)    
 
 
