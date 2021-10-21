@@ -101,192 +101,6 @@ class sampler(Sampler):
     return self.num_data
 
 
-def load_evaluation_data():
-  print(""" THis function loads the evaluation data""", args.imdbval_name)
-  cfg.TRAIN.USE_FLIPPED = False
-  imdb, roidb, ratio_list, ratio_index = combined_roidb(args.imdbval_name, False)
-  imdb.competition_mode(on=True)
-
-  val_size = len(roidb)
-
-  sampler_batch = sampler(val_size, args.batch_size)
-  print('{:d} roidb entries'.format(len(roidb)))
-  dataset = roibatchLoader(roidb, ratio_list, ratio_index, args.batch_size, \
-                        imdb.num_classes, training=False, normalize = False)
-  dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, sampler=sampler_batch,
-                            shuffle=False, num_workers=args.num_workers,
-                            pin_memory=True)
-  ''' 
-  dataset = roibatchLoader(roidb, ratio_list, ratio_index, args.batch_size, \
-                           imdb.num_classes, training=True)
-
-  dataloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size,
-                            sampler=sampler_batch, num_workers=args.num_workers)
-  '''
-
-  return  dataloader, imdb
-
-
-def evaluate(fasterRCNN, dataloader, imdb, output_dir, exp):
-  """ Performs evaluation at the end of every epoch on the model with the validation data"""
-  im_data = torch.FloatTensor(1)
-  im_info = torch.FloatTensor(1)
-  num_boxes = torch.LongTensor(1)
-  gt_boxes = torch.FloatTensor(1)
-
-  # ship to cuda
-  if args.cuda:
-    im_data = im_data.cuda()
-    im_info = im_info.cuda()
-    num_boxes = num_boxes.cuda()
-    gt_boxes = gt_boxes.cuda()
-    fasterRCNN.cuda()
-
-  # make variable
-  im_data = Variable(im_data)
-  im_info = Variable(im_info)
-  num_boxes = Variable(num_boxes)
-  gt_boxes = Variable(gt_boxes)
-
-  if args.cuda:
-    cfg.CUDA = True
-
-  start = time.time()
-  max_per_image = 100
-
-  args.vis = False
-  vis = args.vis
-
-  if vis:
-    thresh = 0.05
-  else:
-    thresh = 0.0
-
-  save_name = 'faster_rcnn_10'
-  num_images = len(imdb.image_index)
-  all_boxes = [[[] for _ in range(num_images)]
-               for _ in range(imdb.num_classes)]
-
-  #output_dir = get_output_dir(imdb, save_name)
-  #dataset = roibatchLoader(roidb, ratio_list, ratio_index, 1, \
-  #                      imdb.num_classes, training=False, normalize = False)
-  #dataloader = torch.utils.data.DataLoader(dataset, batch_size=1,
-  #                          shuffle=False, num_workers=0,
-  #                          pin_memory=True)
-
-  data_iter = iter(dataloader)
-
-  _t = {'im_detect': time.time(), 'misc': time.time()}
-  det_file = os.path.join(output_dir, 'detections.pkl')
-
-  fasterRCNN.eval()
-  empty_array = np.transpose(np.array([[],[],[],[],[]]), (1,0))
-  #for i in range(num_images):
-  for i in range(len(dataloader)):
-
-      data = next(data_iter)
-      with torch.no_grad():
-              im_data.resize_(data[0].size()).copy_(data[0])
-              im_info.resize_(data[1].size()).copy_(data[1])
-              gt_boxes.resize_(data[2].size()).copy_(data[2])
-              num_boxes.resize_(data[3].size()).copy_(data[3])
-
-      det_tic = time.time()
-      rois, cls_prob, bbox_pred, \
-      rpn_loss_cls, rpn_loss_box, \
-      RCNN_loss_cls, RCNN_loss_bbox, \
-      rois_label = fasterRCNN(im_data, im_info, gt_boxes, num_boxes)
-
-      scores = cls_prob.data
-      boxes = rois.data[:, :, 1:5]
-
-      if cfg.TEST.BBOX_REG:
-          # Apply bounding-box regression deltas
-          box_deltas = bbox_pred.data
-          if cfg.TRAIN.BBOX_NORMALIZE_TARGETS_PRECOMPUTED:
-          # Optionally normalize targets by a precomputed mean and stdev
-            if args.class_agnostic:
-                box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                           + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
-                box_deltas = box_deltas.view(1, -1, 4)
-            else:
-                box_deltas = box_deltas.view(-1, 4) * torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_STDS).cuda() \
-                           + torch.FloatTensor(cfg.TRAIN.BBOX_NORMALIZE_MEANS).cuda()
-                box_deltas = box_deltas.view(1, -1, 4 * len(imdb.classes))
-          pred_boxes = bbox_transform_inv(boxes, box_deltas, 1)
-          pred_boxes = clip_boxes(pred_boxes, im_info.data, 1)
-      else:
-          # Simply repeat the boxes, once for each class
-          pred_boxes = np.tile(boxes, (1, scores.shape[1]))
-
-      pred_boxes /= data[1][0][2].item()
-
-      scores = scores.squeeze()
-      pred_boxes = pred_boxes.squeeze()
-      det_toc = time.time()
-      detect_time = det_toc - det_tic
-      misc_tic = time.time()
-      if vis:
-          im = cv2.imread(imdb.image_path_at(i))
-          im2show = np.copy(im)
-      for j in range(1, imdb.num_classes):
-          inds = torch.nonzero(scores[:,j]>thresh).view(-1)
-          # if there is det
-          if inds.numel() > 0:
-            cls_scores = scores[:,j][inds]
-            _, order = torch.sort(cls_scores, 0, True)
-            if args.class_agnostic:
-              cls_boxes = pred_boxes[inds, :]
-            else:
-              cls_boxes = pred_boxes[inds][:, j * 4:(j + 1) * 4]
-
-            cls_dets = torch.cat((cls_boxes, cls_scores.unsqueeze(1)), 1)
-            # cls_dets = torch.cat((cls_boxes, cls_scores), 1)
-            cls_dets = cls_dets[order]
-            keep = nms(cls_boxes[order, :], cls_scores[order], cfg.TEST.NMS)
-            cls_dets = cls_dets[keep.view(-1).long()]
-            if vis:
-              im2show = vis_detections(im2show, imdb.classes[j], cls_dets.cpu().numpy(), 0.3)
-            all_boxes[j][i] = cls_dets.cpu().numpy()
-          else:
-            all_boxes[j][i] = empty_array
-
-      # Limit to max_per_image detections *over all classes*
-      if max_per_image > 0:
-          image_scores = np.hstack([all_boxes[j][i][:, -1]
-                                    for j in range(1, imdb.num_classes)])
-          if len(image_scores) > max_per_image:
-              image_thresh = np.sort(image_scores)[-max_per_image]
-              for j in range(1, imdb.num_classes):
-                  keep = np.where(all_boxes[j][i][:, -1] >= image_thresh)[0]
-                  all_boxes[j][i] = all_boxes[j][i][keep, :]
-
-      misc_toc = time.time()
-      nms_time = misc_toc - misc_tic
-
-      sys.stdout.write('im_detect: {:d}/{:d} {:.3f}s {:.3f}s   \r' \
-          .format(i + 1, num_images, detect_time, nms_time))
-      sys.stdout.flush()
-
-      if vis:
-          cv2.imwrite('result.png', im2show)
-          pdb.set_trace()
-          #cv2.imshow('test', im2show)
-          #cv2.waitKey(0)
-
-  with open(det_file, 'wb') as f:
-      pickle.dump(all_boxes, f, pickle.HIGHEST_PROTOCOL)
-
-
-  print('Evaluating detections')
-  imdb.evaluate_detections(all_boxes, output_dir, exp)
-
-  end = time.time()
-  print("test time: %0.4fs" % (end - start))
-
-
-
-
 def parse_args():
   """
   Parse input arguments
@@ -382,10 +196,32 @@ def parse_args():
                       help='whether use tensorboard',
                       action='store_true')
 
+  parser.add_argument('--cdc', dest='cdc',
+                      help='classification distillation coeff',
+                      default=1, type=float)
+  parser.add_argument('--rdc', dest='rdc',
+                      help='regression distillation coeff',
+                      default=1, type=float)
   args = parser.parse_args()
   return args
 
 
+def classification_distill_loss(student,  teacher):
+    """ student -> input the the classfication head of the RCNN 
+        teacher -> input to the classification head of the  RCNN teacher (resnet18)
+    """
+    ic(student.shape)
+    ic(teacher.shape)
+    return 1
+
+
+def regression_distill_loss(reg_student,  reg_teacher):
+    """ student -> input the the classfication head of the RCNN 
+        teacher -> input to the classification head of the  RCNN teacher (resnet18)
+    """
+    ic(reg_student.shape)
+    ic(reg_teacher.shape)
+    return 1
 
 
 if __name__ == '__main__':
@@ -518,12 +354,19 @@ if __name__ == '__main__':
     fasterRCNN = resnet(imdb.classes, 18, pretrained=True, class_agnostic=args.class_agnostic)
   elif args.net == 'birealnet18':
     fasterRCNN = birealnet(imdb.classes, 18, pretrained=False, class_agnostic=args.class_agnostic)
+    #fasterRCNN = resnet(imdb.classes, 18, pretrained=False, class_agnostic=args.class_agnostic)
 
   else:
     print("network is not defined")
     pdb.set_trace()
 
+  distill =  True
+  if distill:
+      fasterRCNN_teacher = resnet(imdb.classes, 18, pretrained=False, class_agnostic=args.class_agnostic)
+        
+
   fasterRCNN.create_architecture()
+  fasterRCNN_teacher.create_architecture()
 
   lr = cfg.TRAIN.LEARNING_RATE
   lr = args.lr
@@ -543,6 +386,7 @@ if __name__ == '__main__':
 
   if args.cuda:
     fasterRCNN.cuda()
+    fasterRCNN_teacher.cuda()
       
   if args.optimizer == "adam":
     #lr = lr * 0.1
@@ -553,6 +397,8 @@ if __name__ == '__main__':
 
   if args.scheduler=='LambdaLR':
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda step : (1.0-step/args.max_epochs), last_epoch=-1)
+
+      
 
 
 
@@ -570,9 +416,33 @@ if __name__ == '__main__':
       cfg.POOLING_MODE = checkpoint['pooling_mode']
     print("loaded checkpoint %s" % (load_name))
 
+  # Load student
+  student_dir = 'results/birealnet18/coco/adam_Lr0.0001_fasterRCNN_resnet18_baseline_binarynet_LambdaLR'
+  load_name = os.path.join(student_dir, 'faster_rcnn_1_{}_29315.pth'.format(11))
+  #student_dir = 'results/birealnet18/coco/adam_Lr0.0001_fasterRCNN_resnet18_baseline_binarynet_RPN_not_binary'
+  #teacher_dir = 'results/res18/coco/adam_Lr0.0001_fasterRCNN_resnet18_baseline_full_precision'
+  #load_name = os.path.join(teacher_dir, 'faster_rcnn_1_{}_29315.pth'.format(12))
+  checkpoint = torch.load(load_name)
+  fasterRCNN.load_state_dict(checkpoint['model'])
+  print('Student Loaded!!')
+
+  # Load teacher
+  teacher_dir = 'results/res18/coco/adam_Lr0.0001_fasterRCNN_resnet18_baseline_full_precision'
+  load_name = os.path.join(teacher_dir, 'faster_rcnn_1_{}_29315.pth'.format(12))
+  checkpoint_teacher = torch.load(load_name)
+  fasterRCNN_teacher.load_state_dict(checkpoint_teacher['model'])
+  if 'pooling_mode' in checkpoint_teacher.keys():
+  # teacher and student should ahve the same pooling. Here, we are setting the student pooling from teacher
+  # checkpoint. cfg file already has the POOLING_MODE flag. I think pooling between teacher and student
+  # will be consistent regardless of this initialization
+    cfg.POOLING_MODE = checkpoint_teacher['pooling_mode']
+  #fasterRCNN_teacher.eval()
+  fasterRCNN_teacher.train()
+
   #args.mGPUs=False
   if args.mGPUs:
     fasterRCNN = nn.DataParallel(fasterRCNN)
+    #fasterRCNN_teacher = nn.DataParallel(fasterRCNN_teacher)
 
   iters_per_epoch = int(train_size / args.batch_size)
 
@@ -580,8 +450,20 @@ if __name__ == '__main__':
     from tensorboardX import SummaryWriter
     logger = SummaryWriter("logs")
 
+  #set the eval mode for the teacher
+  #fasterRCNN_teacher.eval()
+
+
+
+  print('teacher loaded')
+
   #for epoch in range(args.start_epoch, args.max_epochs + 1):
   for epoch in range(args.start_epoch, args.max_epochs):
+
+
+
+
+
     exp.log_metric('Current epoch', epoch)
     exp.log_metric('Current lr', float(optimizer.param_groups[0]['lr']))
     # setting to train mode
@@ -606,14 +488,66 @@ if __name__ == '__main__':
               gt_boxes.resize_(data[2].size()).copy_(data[2])
               num_boxes.resize_(data[3].size()).copy_(data[3])
 
+
+      with torch.no_grad():
+          #fasterRCNN_teacher.eval()
+          print('forward on teacher')
+          _, cls_prob_teacher, cls_score_teacher, bbox_pred_teacher, \
+          rpn_loss_cls_teacher, rpn_loss_box_teacher, \
+          RCNN_loss_cls_teacher, RCNN_loss_bbox_teacher, \
+          _ = fasterRCNN_teacher(im_data, im_info, gt_boxes, num_boxes)
+            
+
+      loss_teacher = rpn_loss_cls_teacher.mean() + rpn_loss_box_teacher.mean() \
+           + RCNN_loss_cls_teacher.mean() + RCNN_loss_bbox_teacher.mean() 
+
+
+      exp.log_metric('iter_loss_total_teacher', loss_teacher.mean().item())
+      exp.log_metric('iter_loss_rpn_cls_teacher', rpn_loss_cls_teacher.mean().item())
+      exp.log_metric('iter_loss_rpn_bbox_teacher', rpn_loss_box_teacher.mean().item())
+      exp.log_metric('iter_loss_rcnn_cls_teacher', RCNN_loss_cls_teacher.mean().item())
+      exp.log_metric('iter_loss_rcnn_bbox_teacher', RCNN_loss_bbox_teacher.mean().item())
+
+
       fasterRCNN.zero_grad()
-      rois, cls_prob, bbox_pred, \
+      print('forward on student')
+      rois, cls_prob, cls_score, bbox_pred, \
       rpn_loss_cls, rpn_loss_box, \
       RCNN_loss_cls, RCNN_loss_bbox, \
       rois_label = fasterRCNN(im_data, im_info, gt_boxes, num_boxes)
 
+
+
+
+      c_loss_distill = 0    
+      reg_loss_distill = 0    
+      for i in range(args.batch_size):    
+         class_teacher = cls_score_teacher[i]/ torch.norm(cls_score_teacher[i])    
+         reg_teacher = bbox_pred_teacher[i] / torch.norm(bbox_pred_teacher[i])    
+         class_student = cls_score[i] / torch.norm(cls_score[i])    
+         reg_student = bbox_pred[i] / torch.norm(bbox_pred[i])    
+
+         c_loss = torch.norm(class_teacher - class_student)    
+         r_loss = torch.norm(reg_teacher - reg_student)    
+
+         c_loss_distill += c_loss    
+         reg_loss_distill += r_loss    
+
+      class_distill_loss = args.cdc * (c_loss_distill/args.batch_size)    
+      reg_distill_loss = args.rdc * (reg_loss_distill/args.batch_size)    
+
+
+
+
+
+
+
+      #class_distill_loss  = args.cdc * classification_distill_loss(cls_score, cls_score_teacher) 
+      #reg_distill_loss = args.rdc  *  regression_distill_loss(bbox_pred, bbox_pred_teacher)
+
       loss = rpn_loss_cls.mean() + rpn_loss_box.mean() \
-           + RCNN_loss_cls.mean() + RCNN_loss_bbox.mean()
+           + RCNN_loss_cls.mean() + RCNN_loss_bbox.mean() \
+           + class_distill_loss + reg_distill_loss
       loss_temp += loss.item()
 
 
@@ -622,6 +556,10 @@ if __name__ == '__main__':
       exp.log_metric('iter_loss_rpn_bbox', rpn_loss_box.mean().item())
       exp.log_metric('iter_loss_rcnn_cls', RCNN_loss_cls.mean().item())
       exp.log_metric('iter_loss_rcnn_bbox', RCNN_loss_bbox.mean().item())
+
+      exp.log_metric('iter_loss_rcnn_class_distill', class_distill_loss)
+      exp.log_metric('iter_loss_rcnn_bbox_distill', reg_distill_loss)
+
 
 
       # backward
@@ -654,8 +592,8 @@ if __name__ == '__main__':
         print("[session %d][epoch %2d][iter %4d/%4d] loss: %.4f, lr: %.2e" \
                                 % (args.session, epoch, step, iters_per_epoch, loss_temp, lr))
         print("\t\t\tfg/bg=(%d/%d), time cost: %f" % (fg_cnt, bg_cnt, end-start))
-        print("\t\t\trpn_cls: %.4f, rpn_box: %.4f, rcnn_cls: %.4f, rcnn_box %.4f" \
-                      % (loss_rpn_cls, loss_rpn_box, loss_rcnn_cls, loss_rcnn_box))
+        print("\t\t\trpn_cls: %.4f, rpn_box: %.4f, rcnn_cls: %.4f, rcnn_box %.4f class_distill_loss %.4f reg_distill_loss %.4f" \
+                      % (loss_rpn_cls, loss_rpn_box, loss_rcnn_cls, loss_rcnn_box, class_distill_loss, reg_distill_loss))
         if args.use_tfboard:
           info = {
             'loss': loss_temp,
@@ -672,12 +610,19 @@ if __name__ == '__main__':
     if args.scheduler == 'LambdaLR':
         scheduler.step()
 
+    exp.log_metric('epoch_loss_total_teacher', loss_teacher.mean().item())
+    exp.log_metric('epoch_loss_rpn_cls_teacher', rpn_loss_cls_teacher.mean().item())
+    exp.log_metric('epoch_loss_rpn_bbox_teacher', rpn_loss_box_teacher.mean().item())
+    exp.log_metric('epoch_loss_rcnn_cls_teacher', RCNN_loss_cls_teacher.mean().item())
+    exp.log_metric('epoch_loss_rcnn_bbox_teacher', RCNN_loss_bbox_teacher.mean().item())
 
     exp.log_metric('epoch_loss_total', loss.mean().item())
     exp.log_metric('epoch_loss_rpn_cls', rpn_loss_cls.mean().item())
     exp.log_metric('epoch_loss_rpn_bbox', rpn_loss_box.mean().item())
     exp.log_metric('epoch_loss_rcnn_cls', RCNN_loss_cls.mean().item())
     exp.log_metric('epoch_loss_rcnn_bbox', RCNN_loss_bbox.mean().item())
+    exp.log_metric('epoch_loss_rcnn_class_distill', class_distill_loss)
+    exp.log_metric('epoch_loss_rcnn_bbox_distill', reg_distill_loss)
     
     save_name = os.path.join(output_dir, 'faster_rcnn_{}_{}_{}.pth'.format(args.session, epoch, step))
     save_checkpoint({

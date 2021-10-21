@@ -23,7 +23,7 @@ from icecream import ic
 
 class _fasterRCNN(nn.Module):
     """ faster RCNN """
-    def __init__(self, classes, class_agnostic, is_bin=False):
+    def __init__(self, classes, class_agnostic, rpn_bin=False):
         super(_fasterRCNN, self).__init__()
         self.classes = classes
         self.n_classes = len(classes)
@@ -33,7 +33,7 @@ class _fasterRCNN(nn.Module):
         self.RCNN_loss_bbox = 0
 
         # define rpn
-        if is_bin:
+        if rpn_bin:
             self.RCNN_rpn = _RPN_binary(self.dout_base_model)
         else:
             self.RCNN_rpn = _RPN(self.dout_base_model)
@@ -52,6 +52,11 @@ class _fasterRCNN(nn.Module):
         im_info = im_info.data
         gt_boxes = gt_boxes.data
         num_boxes = num_boxes.data
+
+        #ic(im_info, im_info.shape)
+        #ic(gt_boxes.shape)
+        #ic(num_boxes.shape)
+        #print('----->>>><<<<<-----')
 
         # feed image data to base model to obtain base feature map
         base_feat = self.RCNN_base(im_data)
@@ -108,11 +113,28 @@ class _fasterRCNN(nn.Module):
             # bounding box regression L1 loss
             RCNN_loss_bbox = _smooth_l1_loss(bbox_pred, rois_target, rois_inside_ws, rois_outside_ws)
 
+        '''
+        print(' before reshape')
+        ic(cls_score.shape)
+        ic(cls_prob.shape)
+        ic(bbox_pred.shape)
+        ic(rois.shape)
+        print('---after reshape')
+        '''
 
         cls_prob = cls_prob.view(batch_size, rois.size(1), -1)
         bbox_pred = bbox_pred.view(batch_size, rois.size(1), -1)
+        cls_score = cls_score.view(batch_size, rois.size(1), -1)
 
-        return rois, cls_prob, bbox_pred, rpn_loss_cls, rpn_loss_bbox, RCNN_loss_cls, RCNN_loss_bbox, rois_label
+        '''
+        ic(rois.shape)
+        ic(cls_prob.shape)
+        ic(bbox_pred.shape)
+
+        print('---------->>>>>>>>')
+        '''
+
+        return rois, cls_prob, cls_score,  bbox_pred, rpn_loss_cls, rpn_loss_bbox, RCNN_loss_cls, RCNN_loss_bbox, rois_label
 
     def _init_weights(self):
         def normal_init(m, mean, stddev, truncated=False):

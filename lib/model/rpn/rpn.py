@@ -16,6 +16,8 @@ import math
 import pdb
 import time
 
+from icecream import ic
+
 '''
 class BinaryActivation(nn.Module):
     def __init__(self):
@@ -139,11 +141,15 @@ class _RPN_binary(nn.Module):
         rois = self.RPN_proposal((rpn_cls_prob.data, rpn_bbox_pred.data,
                                  im_info, cfg_key))
 
+        #print('%%%%%%%%binary rpn%%%%%%%%%')
+        #ic(rois.shape)
+
         self.rpn_loss_cls = 0
         self.rpn_loss_box = 0
 
         # generating training labels and build the rpn loss
         if self.training:
+            #print('In Training RPN')
             assert gt_boxes is not None
 
             rpn_data = self.RPN_anchor_target((rpn_cls_score.data, gt_boxes, im_info, num_boxes))
@@ -235,6 +241,9 @@ class _RPN(nn.Module):
 
         rois = self.RPN_proposal((rpn_cls_prob.data, rpn_bbox_pred.data,
                                  im_info, cfg_key))
+        #print('%%%%%%%%fp rpn%%%%%%%%%')
+        #ic(rois.shape)
+        #ic(self.training)
 
         self.rpn_loss_cls = 0
         self.rpn_loss_box = 0
