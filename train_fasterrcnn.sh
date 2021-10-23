@@ -1,4 +1,4 @@
-export CUDA_VISIBLE_DEVICES='4,5'
+export CUDA_VISIBLE_DEVICES='0,1'
 
 PRETRAIN_MODEL='/media/apple/faster-rcnn.pytorch/resnet18-5c106cde.pth'
 #DATASET_PATH='/home/biometrics/data/coco'

@@ -101,7 +101,43 @@ class sampler(Sampler):
     return self.num_data
 
 
+
 def KL_loss(teacher_output, student_output, id_=1):    
+      """Process the KL divergence between the teacher and the student outputs after                 
+      the sigmoid operation. The logit maps have been normalized for unit norm.    
+                                                                                            
+      Arguments:                                                                                     
+          teacher_output (torch.Tensor) - Nx(h*w*num_anchors)x80 for class    
+                                        - Nx(h*w*num_anchrs)x4 for reg        
+                                        teacher not softmaxed                                        
+          student_output (torch.Tensor) - same as teacher but not softmaxed    
+      Returns:                                   
+          KL divergence loss over the batch                                                         
+      """                                           
+      assert(teacher_output.shape == student_output.shape)    
+                                                     
+      student_output_s = F.log_softmax(student_output, dim=2)                      
+      teacher_output_s = F.softmax(teacher_output, dim=2)    
+                                                                         
+      mean_  = 0                                     
+      for i in range(teacher_output.shape[0]):                      
+          #  looping over samples in a batch                             
+          teacher = teacher_output_s[i, :, :]#.unsqueeze(axis=1)    
+          student = student_output_s[i, :, :]#.unsqueeze(axis=2)    
+          teacher = teacher.unsqueeze(axis=1)                                  
+          student = student.unsqueeze(axis=2)                                  
+          #ic(teacher.shape, student.shape)                    
+          # teacher shape is num x 1 x 80 and student shape is num x 80 x 1    
+          cross_entropy_loss = -torch.bmm(teacher, student)                         
+          #ic(cross_entropy_loss.shape)    
+          #  result is num x 1 x 1                              
+                                                 
+          #sum_ += sum(cross_entropy_loss)                               
+          mean_  += cross_entropy_loss.mean()        
+                                                                    
+      return mean_/teacher_output.shape[0]        
+
+def old_KL_loss(teacher_output, student_output, id_=1):    
     """Process the KL divergence between the teacher and the student outputs after    
     the sigmoid operation. The logit maps have been normalized for unit norm.    
     
