@@ -566,7 +566,7 @@ if __name__ == '__main__':
 
       with torch.no_grad():
           #fasterRCNN_teacher.eval()
-          print('forward on teacher')
+          #print('forward on teacher')
           _, cls_prob_teacher, cls_score_teacher, bbox_pred_teacher, \
           rpn_loss_cls_teacher, rpn_loss_box_teacher, \
           RCNN_loss_cls_teacher, RCNN_loss_bbox_teacher, \
@@ -585,7 +585,7 @@ if __name__ == '__main__':
 
 
       fasterRCNN.zero_grad()
-      print('forward on student')
+      #print('forward on student')
       rois, cls_prob, cls_score, bbox_pred, \
       rpn_loss_cls, rpn_loss_box, \
       RCNN_loss_cls, RCNN_loss_bbox, \
@@ -608,6 +608,8 @@ if __name__ == '__main__':
          #c_loss_distill += c_loss    
          reg_loss_distill += r_loss    
 
+
+      #ic(args.cdc, args.rdc)
       class_distill_loss = args.cdc * KL_loss(cls_score_teacher, cls_score) #(c_loss_distill/args.batch_size)    
       reg_distill_loss = args.rdc * (reg_loss_distill/args.batch_size)    
 
