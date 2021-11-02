@@ -23,7 +23,7 @@ from icecream import ic
 
 class _fasterRCNN(nn.Module):
     """ faster RCNN """
-    def __init__(self, classes, class_agnostic, rpn_bin=False):
+    def __init__(self, classes, class_agnostic, rpn_bin=False, is_teacher=False):
         super(_fasterRCNN, self).__init__()
         self.classes = classes
         self.n_classes = len(classes)
@@ -31,12 +31,13 @@ class _fasterRCNN(nn.Module):
         # loss
         self.RCNN_loss_cls = 0
         self.RCNN_loss_bbox = 0
+        self.is_teacher = is_teacher
 
         # define rpn
         if rpn_bin:
             self.RCNN_rpn = _RPN_binary(self.dout_base_model)
         else:
-            self.RCNN_rpn = _RPN(self.dout_base_model)
+            self.RCNN_rpn = _RPN(self.dout_base_model, is_teacher)
 
         self.RCNN_proposal_target = _ProposalTargetLayer(self.n_classes)
 
@@ -58,13 +59,15 @@ class _fasterRCNN(nn.Module):
         #ic(num_boxes.shape)
         #print('----->>>><<<<<-----')
 
+        #ic(self.training)
+
         # feed image data to base model to obtain base feature map
         base_feat = self.RCNN_base(im_data)
         # feed base feature map tp RPN to obtain rois
         rois, rpn_loss_cls, rpn_loss_bbox = self.RCNN_rpn(base_feat, im_info, gt_boxes, num_boxes)
 
         # if it is training phrase, then use ground trubut bboxes for refining
-        if self.training:
+        if self.training or self.is_teacher:
             roi_data = self.RCNN_proposal_target(rois, gt_boxes, num_boxes)
             rois, rois_label, rois_target, rois_inside_ws, rois_outside_ws = roi_data
 
@@ -113,7 +116,7 @@ class _fasterRCNN(nn.Module):
             # bounding box regression L1 loss
             RCNN_loss_bbox = _smooth_l1_loss(bbox_pred, rois_target, rois_inside_ws, rois_outside_ws)
 
-        '''
+        ''' 
         print(' before reshape')
         ic(cls_score.shape)
         ic(cls_prob.shape)
@@ -131,7 +134,7 @@ class _fasterRCNN(nn.Module):
         ic(cls_prob.shape)
         ic(bbox_pred.shape)
 
-        print('---------->>>>>>>>')
+        print('$$$$$$$$---------->>>>>>>>')
         '''
 
         return rois, cls_prob, cls_score,  bbox_pred, rpn_loss_cls, rpn_loss_bbox, RCNN_loss_cls, RCNN_loss_bbox, rois_label

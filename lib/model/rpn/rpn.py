@@ -181,9 +181,10 @@ class _RPN_binary(nn.Module):
 
 class _RPN(nn.Module):
     """ region proposal network """
-    def __init__(self, din, is_bin=False):
+    def __init__(self, din, is_teacher=False):
         super(_RPN, self).__init__()
         
+        self.is_teacher = is_teacher
         self.din = din  # get depth of input feature map, e.g., 512
         self.anchor_scales = cfg.ANCHOR_SCALES
         self.anchor_ratios = cfg.ANCHOR_RATIOS
@@ -237,7 +238,7 @@ class _RPN(nn.Module):
         rpn_bbox_pred = self.RPN_bbox_pred(rpn_conv1)
 
         # proposal layer
-        cfg_key = 'TRAIN' if self.training else 'TEST'
+        cfg_key = 'TRAIN' if self.training or self.is_teacher else 'TEST'
 
         rois = self.RPN_proposal((rpn_cls_prob.data, rpn_bbox_pred.data,
                                  im_info, cfg_key))

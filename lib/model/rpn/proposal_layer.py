@@ -21,6 +21,8 @@ from .bbox_transform import bbox_transform_inv, clip_boxes, clip_boxes_batch
 from model.roi_layers import nms
 import pdb
 
+from icecream import ic
+
 DEBUG = False
 
 class _ProposalLayer(nn.Module):
@@ -73,6 +75,14 @@ class _ProposalLayer(nn.Module):
         post_nms_topN = cfg[cfg_key].RPN_POST_NMS_TOP_N
         nms_thresh    = cfg[cfg_key].RPN_NMS_THRESH
         min_size      = cfg[cfg_key].RPN_MIN_SIZE
+
+        '''
+        print('---->>>>>>')
+        ic(cfg_key)
+        ic(pre_nms_topN, post_nms_topN, nms_thresh, min_size)
+        print('---->>>>>>')
+        '''
+
 
         batch_size = bbox_deltas.size(0)
 

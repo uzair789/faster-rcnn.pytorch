@@ -492,7 +492,7 @@ if __name__ == '__main__':
     print("loaded checkpoint %s" % (load_name))
 
   # Load student
-  student_dir = 'results/birealnet18/coco/adam_Lr0.0001_fasterRCNN_resnet18_baseline_binarynet_LambdaLR'
+  student_dir = 'results/birealnet18/coco/adam_Lr0.0001_fasterRCNN_resnet18_baseline_binarynet_LambdaLR_classAgnostic'
   load_name = os.path.join(student_dir, 'faster_rcnn_1_{}_29315.pth'.format(11))
   #student_dir = 'results/birealnet18/coco/adam_Lr0.0001_fasterRCNN_resnet18_baseline_binarynet_RPN_not_binary'
   #teacher_dir = 'results/res18/coco/adam_Lr0.0001_fasterRCNN_resnet18_baseline_full_precision'
@@ -511,8 +511,8 @@ if __name__ == '__main__':
   # checkpoint. cfg file already has the POOLING_MODE flag. I think pooling between teacher and student
   # will be consistent regardless of this initialization
     cfg.POOLING_MODE = checkpoint_teacher['pooling_mode']
-  #fasterRCNN_teacher.eval()
-  fasterRCNN_teacher.train()
+  fasterRCNN_teacher.eval()
+  #fasterRCNN_teacher.train()
 
   #args.mGPUs=False
   if args.mGPUs:
@@ -566,13 +566,13 @@ if __name__ == '__main__':
 
       with torch.no_grad():
           #fasterRCNN_teacher.eval()
-          #print('forward on teacher')
+          print('forward on teacher')
           _, cls_prob_teacher, cls_score_teacher, bbox_pred_teacher, \
           rpn_loss_cls_teacher, rpn_loss_box_teacher, \
           RCNN_loss_cls_teacher, RCNN_loss_bbox_teacher, \
           _ = fasterRCNN_teacher(im_data, im_info, gt_boxes, num_boxes)
             
-
+      '''
       loss_teacher = rpn_loss_cls_teacher.mean() + rpn_loss_box_teacher.mean() \
            + RCNN_loss_cls_teacher.mean() + RCNN_loss_bbox_teacher.mean() 
 
@@ -582,17 +582,14 @@ if __name__ == '__main__':
       exp.log_metric('iter_loss_rpn_bbox_teacher', rpn_loss_box_teacher.mean().item())
       exp.log_metric('iter_loss_rcnn_cls_teacher', RCNN_loss_cls_teacher.mean().item())
       exp.log_metric('iter_loss_rcnn_bbox_teacher', RCNN_loss_bbox_teacher.mean().item())
-
+      '''
 
       fasterRCNN.zero_grad()
-      #print('forward on student')
+      print('forward on student')
       rois, cls_prob, cls_score, bbox_pred, \
       rpn_loss_cls, rpn_loss_box, \
       RCNN_loss_cls, RCNN_loss_bbox, \
       rois_label = fasterRCNN(im_data, im_info, gt_boxes, num_boxes)
-
-
-
 
       #c_loss_distill = 0    
       reg_loss_distill = 0    
@@ -601,7 +598,7 @@ if __name__ == '__main__':
          reg_teacher = bbox_pred_teacher[i] / torch.norm(bbox_pred_teacher[i])    
          #class_student = cls_score[i] / torch.norm(cls_score[i])    
          reg_student = bbox_pred[i] / torch.norm(bbox_pred[i])    
-
+ 
          #c_loss = torch.norm(class_teacher - class_student)    
          r_loss = torch.norm(reg_teacher - reg_student)    
 
@@ -612,12 +609,6 @@ if __name__ == '__main__':
       #ic(args.cdc, args.rdc)
       class_distill_loss = args.cdc * KL_loss(cls_score_teacher, cls_score) #(c_loss_distill/args.batch_size)    
       reg_distill_loss = args.rdc * (reg_loss_distill/args.batch_size)    
-
-
-
-
-
-
 
       #class_distill_loss  = args.cdc * classification_distill_loss(cls_score, cls_score_teacher) 
       #reg_distill_loss = args.rdc  *  regression_distill_loss(bbox_pred, bbox_pred_teacher)
